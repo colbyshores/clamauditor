@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+require 'net/smtp'
+require 'rubygems'
+require 'sys/proctable'
+include Sys
+
+active = false
+Sys::ProcTable.ps.each { |ps|
+  if ps.name == "clamscan"
+    active = true
+  end
+}
+if !active
+  `freshclam`
+  `clamscan -r --move=/root/detect/banished <%= @scanpath %> --exclude-dir=\.snapshot --exclude=\.snapshot --log=/root/detect/log --infected`
+end
+recipients = Array.new
+recipients = [<%= @emails %>]
+Dir.entries("<%= @path %>detect/banished").select {|f|
+  if f != '.' and f != '..'
+    mailuser = '<%= @fromemail %>'
+    mailsmtp = '<%= @smtpserver %>'
+    Net::SMTP.start(mailsmtp, 25) do |smtp|
+      recipients.each do |recipient|
+        message = ''
+        message = <<EOF
+From: Admin <#{mailuser}>
+To: User <#{recipient}>
+Subject: Malware Detected!
+
+Malware Detected! #{f}
+EOF
+        smtp.send_message(message, mailuser, recipient)
+      end
+    end
+  end
+}
+

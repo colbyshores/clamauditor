@@ -1,0 +1,33 @@
+require 'net/smtp'
+require 'rubygems'
+require 'digest/md5'
+watchlist = File.readlines("/etc/watchlist.conf")
+threads = []
+watchlist.each do |filename|
+  threads <<  Thread.new {
+    hash = Digest::MD5.hexdigest(File.read(filename[0..-2]))
+    while true
+      newhash = Digest::MD5.hexdigest(File.read(filename[0..-2]))
+      if newhash != hash
+        recipients = Array.new
+        recipients = [<%= @emails %>]
+        mailuser = '<%= @fromemail %>'
+        mailsmtp = '<%= @smtpserver %>'
+        Net::SMTP.start(mailsmtp, 25) do |smtp|
+            message = ''
+            message = <<EOF
+From: Admin <#{mailuser}>
+To: #{recipients.join(", ")}
+Subject: Checksum Modified!
+
+Checksum Modfied on #{filename}!
+EOF
+          smtp.send_message(message, mailuser, recipients)
+        end
+        hash = newhash
+      end
+      sleep(1)
+    end
+  }
+end
+threads.each { |thr| thr.join }
